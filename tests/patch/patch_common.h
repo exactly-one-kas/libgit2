@@ -905,3 +905,48 @@
 	"-b\n" \
 	"+bb\n" \
 	" c\n"
+
+#define PATCH_BINARY_FILE_WITH_MISSING_PATHS \
+	"diff --git  \n" \
+	"--- \n" \
+	"+++ \n" \
+	"Binary files "
+
+#define PATCH_BINARY_FILE_WITH_WHITESPACE_PATHS \
+	"diff --git a/file b/file\n" \
+	"---  \n" \
+	"+++  \n" \
+	"Binary files "
+
+#define PATCH_BINARY_FILE_WITH_QUOTED_EMPTY_PATHS \
+	"diff --git a/file b/file\n" \
+	"--- \"\"\n" \
+	"+++ \"\"\n" \
+	"Binary files "
+
+#define PATCH_BINARY_FILE_PATH_WITH_SPACES \
+	"diff --git a b c d e f\n" \
+	"--- a b c\n" \
+	"+++ d e f\n" \
+	"Binary files a b c and d e f differ"
+
+#define PATCH_BINARY_FILE_PATH_WITHOUT_BODY_PATHS \
+	"diff --git a b c d e f\n" \
+	"--- \n" \
+	"+++ \n" \
+	"Binary files a b c and d e f differ"
+
+#define PATCH_MULTIPLE_OLD_PATHS \
+	"diff --git  \n" \
+	"---  \n" \
+	"+++ \n" \
+	"index 0000..7DDb\n" \
+	"--- \n"
+
+#define PATCH_INTMAX_NEW_LINES \
+	"diff --git a/file b/file\n" \
+	"--- a/file\n" \
+	"+++ b/file\n" \
+	"@@ -0 +2147483647 @@\n" \
+	"\n" \
+	"  "
