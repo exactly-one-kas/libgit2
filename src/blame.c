@@ -415,7 +415,7 @@ on_error:
 
 static bool hunk_is_bufferblame(git_blame_hunk *hunk)
 {
-	return git_oid_is_zero(&hunk->final_commit_id);
+	return hunk && git_oid_is_zero(&hunk->final_commit_id);
 }
 
 static int buffer_hunk_cb(
@@ -538,7 +538,9 @@ int git_blame_options_init(git_blame_options *opts, unsigned int version)
 	return 0;
 }
 
+#ifndef GIT_DEPRECATE_HARD
 int git_blame_init_options(git_blame_options *opts, unsigned int version)
 {
 	return git_blame_options_init(opts, version);
 }
+#endif

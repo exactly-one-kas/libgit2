@@ -123,10 +123,12 @@ int git_indexer_options_init(git_indexer_options *opts, unsigned int version)
 	return 0;
 }
 
+#ifndef GIT_DEPRECATE_HARD
 int git_indexer_init_options(git_indexer_options *opts, unsigned int version)
 {
 	return git_indexer_options_init(opts, version);
 }
+#endif
 
 int git_indexer_new(
 		git_indexer **out,
@@ -265,10 +267,11 @@ static int advance_delta_offset(git_indexer *idx, git_object_t type)
 	if (type == GIT_OBJECT_REF_DELTA) {
 		idx->off += GIT_OID_RAWSZ;
 	} else {
-		off64_t base_off = get_delta_base(idx->pack, &w, &idx->off, type, idx->entry_start);
+		off64_t base_off;
+		int error = get_delta_base(&base_off, idx->pack, &w, &idx->off, type, idx->entry_start);
 		git_mwindow_close(&w);
-		if (base_off < 0)
-			return (int)base_off;
+		if (error < 0)
+			return error;
 	}
 
 	return 0;

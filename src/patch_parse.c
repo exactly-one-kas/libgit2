@@ -411,6 +411,7 @@ static const parse_header_transition transitions[] = {
 	{ "GIT binary patch"    , STATE_INDEX,      STATE_END,        NULL },
 	{ "Binary files "       , STATE_INDEX,      STATE_END,        NULL },
 
+	{ "similarity index "   , STATE_END,        STATE_SIMILARITY, parse_header_similarity },
 	{ "similarity index "   , STATE_DIFF,       STATE_SIMILARITY, parse_header_similarity },
 	{ "dissimilarity index ", STATE_DIFF,       STATE_SIMILARITY, parse_header_dissimilarity },
 	{ "rename from "        , STATE_SIMILARITY, STATE_RENAME,     parse_header_renamefrom },
@@ -940,7 +941,7 @@ static int parse_patch_body(
 		return parse_patch_hunks(patch, ctx);
 }
 
-int check_header_names(
+static int check_header_names(
 	const char *one,
 	const char *two,
 	const char *old_or_new,
