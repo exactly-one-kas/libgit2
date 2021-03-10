@@ -195,7 +195,7 @@ static bool checkout_is_workdir_modified(
 		}
 
 		if (git_submodule_status(&sm_status, sm, GIT_SUBMODULE_IGNORE_UNSPECIFIED) < 0 ||
-			GIT_SUBMODULE_STATUS_IS_WD_DIRTY(sm_status))
+		    GIT_SUBMODULE_STATUS_IS_WD_DIRTY(sm_status))
 			rval = true;
 		else if ((sm_oid = git_submodule_wd_id(sm)) == NULL)
 			rval = false;
@@ -1246,7 +1246,7 @@ static int checkout_conflict_append_remove(
 	checkout_data *data = payload;
 	const char *name;
 
-	assert(ancestor || ours || theirs);
+	GIT_ASSERT_ARG(ancestor || ours || theirs);
 
 	if (ancestor)
 		name = git__strdup(ancestor->path);
@@ -1490,7 +1490,9 @@ static int checkout_stream_write(
 static int checkout_stream_close(git_writestream *s)
 {
 	struct checkout_stream *stream = (struct checkout_stream *)s;
-	assert(stream && stream->open);
+
+	GIT_ASSERT_ARG(stream);
+	GIT_ASSERT_ARG(stream->open);
 
 	stream->open = 0;
 	return p_close(stream->fd);
@@ -1557,7 +1559,7 @@ static int blob_content_to_file(
 
 	error = git_filter_list_stream_blob(fl, blob, &writer.base);
 
-	assert(writer.open == 0);
+	GIT_ASSERT(writer.open == 0);
 
 	git_filter_list_free(fl);
 
@@ -1979,7 +1981,7 @@ static int checkout_write_entry(
 	struct stat st;
 	int error;
 
-	assert (side == conflict->ours || side == conflict->theirs);
+	GIT_ASSERT(side == conflict->ours || side == conflict->theirs);
 
 	if (checkout_target_fullpath(&fullpath, data, side->path) < 0)
 		return -1;
@@ -2591,7 +2593,7 @@ int git_checkout_iterator(
 	}
 
 	/* Should not have case insensitivity mismatch */
-	assert(git_iterator_ignore_case(workdir) == git_iterator_ignore_case(baseline));
+	GIT_ASSERT(git_iterator_ignore_case(workdir) == git_iterator_ignore_case(baseline));
 
 	/* Generate baseline-to-target diff which will include an entry for
 	 * every possible update that might need to be made.
@@ -2642,7 +2644,7 @@ int git_checkout_iterator(
 		(error = checkout_extensions_update_index(&data)) < 0)
 		goto cleanup;
 
-	assert(data.completed_steps == data.total_steps);
+	GIT_ASSERT(data.completed_steps == data.total_steps);
 
 	if (data.opts.perfdata_cb)
 		data.opts.perfdata_cb(&data.perfdata, data.opts.perfdata_payload);
@@ -2770,7 +2772,8 @@ int git_checkout_head(
 	git_repository *repo,
 	const git_checkout_options *opts)
 {
-	assert(repo);
+	GIT_ASSERT_ARG(repo);
+
 	return git_checkout_tree(repo, NULL, opts);
 }
 

@@ -47,10 +47,8 @@ ntlm_client *ntlm_client_init(ntlm_client_flags flags)
 {
 	ntlm_client *ntlm = NULL;
 
-	if ((ntlm = malloc(sizeof(ntlm_client))) == NULL)
+	if ((ntlm = calloc(1, sizeof(ntlm_client))) == NULL)
 		return NULL;
-
-	memset(ntlm, 0, sizeof(ntlm_client));
 
 	ntlm->flags = flags;
 
@@ -134,10 +132,10 @@ int ntlm_client_set_hostname(
 static void free_credentials(ntlm_client *ntlm)
 {
 	if (ntlm->password)
-		memzero(ntlm->password, strlen(ntlm->password));
+		ntlm_memzero(ntlm->password, strlen(ntlm->password));
 
 	if (ntlm->password_utf16)
-		memzero(ntlm->password_utf16, ntlm->password_utf16_len);
+		ntlm_memzero(ntlm->password_utf16, ntlm->password_utf16_len);
 
 	free(ntlm->username);
 	free(ntlm->username_upper);
@@ -260,6 +258,9 @@ static inline bool write_buf(
 	const unsigned char *buf,
 	size_t len)
 {
+	if (!len)
+		return true;
+
 	if (out->len - out->pos < len) {
 		ntlm_client_set_errmsg(ntlm, "out of buffer space");
 		return false;
@@ -648,12 +649,10 @@ int ntlm_client_negotiate(
 		return -1;
 	}
 
-	if ((ntlm->negotiate.buf = malloc(ntlm->negotiate.len)) == NULL) {
+	if ((ntlm->negotiate.buf = calloc(1, ntlm->negotiate.len)) == NULL) {
 		ntlm_client_set_errmsg(ntlm, "out of memory");
 		return -1;
 	}
-
-	memset(ntlm->negotiate.buf, 0, ntlm->negotiate.len);
 
 	if (!write_buf(ntlm, &ntlm->negotiate,
 			ntlm_client_signature, sizeof(ntlm_client_signature)) ||
@@ -1122,11 +1121,11 @@ static bool generate_ntlm2_challengehash(
 static bool generate_lm2_response(ntlm_client *ntlm,
 	unsigned char ntlm2_hash[NTLM_NTLM2_HASH_LEN])
 {
-	unsigned char lm2_challengehash[16];
+	unsigned char lm2_challengehash[16] = {0};
 	size_t lm2_len = 16;
 	uint64_t local_nonce;
 
-	local_nonce = htonll(ntlm->nonce);
+	local_nonce = ntlm_htonll(ntlm->nonce);
 
 	if (!ntlm_hmac_ctx_reset(ntlm->hmac_ctx) ||
 		!ntlm_hmac_md5_init(ntlm->hmac_ctx,
@@ -1177,7 +1176,7 @@ static bool generate_ntlm2_response(ntlm_client *ntlm)
 	uint32_t signature;
 	uint64_t timestamp, nonce;
 	unsigned char ntlm2_hash[NTLM_NTLM2_HASH_LEN];
-	unsigned char challengehash[16];
+	unsigned char challengehash[16] = {0};
 	unsigned char *blob;
 
 	if (!generate_timestamp(ntlm) ||
@@ -1198,8 +1197,8 @@ static bool generate_ntlm2_response(ntlm_client *ntlm)
 
 	/* the blob's integer values are in network byte order */
 	signature = htonl(0x01010000);
-	timestamp = htonll(ntlm->timestamp);
-	nonce = htonll(ntlm->nonce);
+	timestamp = ntlm_htonll(ntlm->timestamp);
+	nonce = ntlm_htonll(ntlm->nonce);
 
 	/* construct the blob */
 	memcpy(&blob[0], &signature, 4);
@@ -1334,12 +1333,10 @@ int ntlm_client_response(
 		return -1;
 	}
 
-	if ((ntlm->response.buf = malloc(ntlm->response.len)) == NULL) {
+	if ((ntlm->response.buf = calloc(1, ntlm->response.len)) == NULL) {
 		ntlm_client_set_errmsg(ntlm, "out of memory");
 		return -1;
 	}
-
-	memset(ntlm->response.buf, 0, ntlm->response.len);
 
 	if (!write_buf(ntlm, &ntlm->response,
 			ntlm_client_signature, sizeof(ntlm_client_signature)) ||

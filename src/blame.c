@@ -171,20 +171,21 @@ void git_blame_free(git_blame *blame)
 
 uint32_t git_blame_get_hunk_count(git_blame *blame)
 {
-	assert(blame);
+	GIT_ASSERT_ARG(blame);
 	return (uint32_t)blame->hunks.length;
 }
 
 const git_blame_hunk *git_blame_get_hunk_byindex(git_blame *blame, uint32_t index)
 {
-	assert(blame);
+	GIT_ASSERT_ARG_WITH_RETVAL(blame, NULL);
 	return (git_blame_hunk*)git_vector_get(&blame->hunks, index);
 }
 
 const git_blame_hunk *git_blame_get_hunk_byline(git_blame *blame, size_t lineno)
 {
 	size_t i, new_lineno = lineno;
-	assert(blame);
+
+	GIT_ASSERT_ARG_WITH_RETVAL(blame, NULL);
 
 	if (!git_vector_bsearch2(&i, &blame->hunks, hunk_byfinalline_search_cmp, &new_lineno)) {
 		return git_blame_get_hunk_byindex(blame, (uint32_t)i);
@@ -388,7 +389,10 @@ int git_blame_file(
 	git_blame_options normOptions = GIT_BLAME_OPTIONS_INIT;
 	git_blame *blame = NULL;
 
-	assert(out && repo && path);
+	GIT_ASSERT_ARG(out);
+	GIT_ASSERT_ARG(repo);
+	GIT_ASSERT_ARG(path);
+
 	if ((error = normalize_options(&normOptions, options, repo)) < 0)
 		goto on_error;
 
@@ -428,7 +432,7 @@ static int buffer_hunk_cb(
 
 	GIT_UNUSED(delta);
 
-	wedge_line = (hunk->old_lines == 0) ? hunk->new_start : hunk->old_start;
+	wedge_line = hunk->new_start + (hunk->new_lines == 0 ? 1 : 0);
 	blame->current_diff_line = wedge_line;
 
 	blame->current_hunk = (git_blame_hunk*)git_blame_get_hunk_byline(blame, wedge_line);
@@ -441,7 +445,7 @@ static int buffer_hunk_cb(
 	} else if (!hunk_starts_at_or_after_line(blame->current_hunk, wedge_line)){
 		/* If this hunk doesn't start between existing hunks, split a hunk up so it does */
 		blame->current_hunk = split_hunk_in_vector(&blame->hunks, blame->current_hunk,
-				wedge_line - blame->current_hunk->orig_start_line_number, true);
+				wedge_line - blame->current_hunk->final_start_line_number, true);
 		GIT_ERROR_CHECK_ALLOC(blame->current_hunk);
 	}
 
@@ -465,8 +469,9 @@ static int buffer_line_cb(
 		if (hunk_is_bufferblame(blame->current_hunk) &&
 		    hunk_ends_at_or_before_line(blame->current_hunk, blame->current_diff_line)) {
 			/* Append to the current buffer-blame hunk */
+			shift_hunks_by(&blame->hunks, blame->current_hunk->final_start_line_number +
+				blame->current_hunk->lines_in_hunk, 1);
 			blame->current_hunk->lines_in_hunk++;
-			shift_hunks_by(&blame->hunks, blame->current_diff_line+1, 1);
 		} else {
 			/* Create a new buffer-blame hunk with this line */
 			shift_hunks_by(&blame->hunks, blame->current_diff_line, 1);
@@ -480,11 +485,11 @@ static int buffer_line_cb(
 
 	if (line->origin == GIT_DIFF_LINE_DELETION) {
 		/* Trim the line from the current hunk; remove it if it's now empty */
-		size_t shift_base = blame->current_diff_line + blame->current_hunk->lines_in_hunk+1;
+		size_t shift_base = blame->current_hunk->final_start_line_number +
+			blame->current_hunk->lines_in_hunk;
 
 		if (--(blame->current_hunk->lines_in_hunk) == 0) {
 			size_t i;
-			shift_base--;
 			if (!git_vector_search2(&i, &blame->hunks, ptrs_equal_cmp, blame->current_hunk)) {
 				git_vector_remove(&blame->hunks, i);
 				free_hunk(blame->current_hunk);
@@ -509,7 +514,9 @@ int git_blame_buffer(
 
 	diffopts.context_lines = 0;
 
-	assert(out && reference && buffer && buffer_len);
+	GIT_ASSERT_ARG(out);
+	GIT_ASSERT_ARG(reference);
+	GIT_ASSERT_ARG(buffer && buffer_len);
 
 	blame = git_blame__alloc(reference->repository, reference->options, reference->path);
 	GIT_ERROR_CHECK_ALLOC(blame);

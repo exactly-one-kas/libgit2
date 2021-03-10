@@ -13,7 +13,7 @@
 
 CMAKE_MINIMUM_REQUIRED(VERSION 3.5.1)
 
-project(libgit2 C)
+project(libgit2 VERSION "1.1.0" LANGUAGES C)
 
 # Add find modules to the path
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${libgit2_SOURCE_DIR}/cmake/")
@@ -50,7 +50,7 @@ OPTION(USE_STANDALONE_FUZZERS		"Enable standalone fuzzers (compatible with gcc)"
 OPTION(USE_LEAK_CHECKER			"Run tests with leak checker"				OFF)
 OPTION(DEBUG_POOL			"Enable debug pool allocator"				OFF)
 OPTION(ENABLE_WERROR			"Enable compilation with -Werror"			OFF)
-OPTION(USE_BUNDLED_ZLIB    		"Use the bundled version of zlib"			OFF)
+OPTION(USE_BUNDLED_ZLIB    		"Use the bundled version of zlib. Can be set to one of Bundled(ON)/Chromium. The Chromium option requires a x86_64 processor with SSE4.2 and CLMUL"			OFF)
    SET(USE_HTTP_PARSER			"" CACHE STRING "Specifies the HTTP Parser implementation; either system or builtin.")
 OPTION(DEPRECATE_HARD			"Do not include deprecated functions in the library"	OFF)
    SET(REGEX_BACKEND			"" CACHE STRING "Regular expression implementation. One of regcomp_l, pcre2, pcre, regcomp, or builtin.")
@@ -89,19 +89,9 @@ IF(WIN32)
 ENDIF()
 
 IF(MSVC)
-	# Enable MSVC CRTDBG memory leak reporting when in debug mode.
-	OPTION(MSVC_CRTDBG 		"Enable CRTDBG memory leak reporting"			OFF)
+	# Enable leak checking using the debugging C runtime.
+	OPTION(WIN32_LEAKCHECK		"Enable leak reporting via crtdbg"			OFF)
 ENDIF()
-
-FILE(STRINGS "${libgit2_SOURCE_DIR}/include/git2/version.h" GIT2_HEADER REGEX "^#define LIBGIT2_VERSION \"[^\"]*\"$")
-
-STRING(REGEX REPLACE "^.*LIBGIT2_VERSION \"([0-9]+).*$" "\\1" LIBGIT2_VERSION_MAJOR "${GIT2_HEADER}")
-STRING(REGEX REPLACE "^.*LIBGIT2_VERSION \"[0-9]+\\.([0-9]+).*$" "\\1" LIBGIT2_VERSION_MINOR  "${GIT2_HEADER}")
-STRING(REGEX REPLACE "^.*LIBGIT2_VERSION \"[0-9]+\\.[0-9]+\\.([0-9]+).*$" "\\1" LIBGIT2_VERSION_REV "${GIT2_HEADER}")
-SET(LIBGIT2_VERSION_STRING "${LIBGIT2_VERSION_MAJOR}.${LIBGIT2_VERSION_MINOR}.${LIBGIT2_VERSION_REV}")
-
-FILE(STRINGS "${libgit2_SOURCE_DIR}/include/git2/version.h" GIT2_HEADER_SOVERSION REGEX "^#define LIBGIT2_SOVERSION \"([0-9.]+)\"$")
-STRING(REGEX REPLACE "^.*LIBGIT2_SOVERSION \"([0-9.]+)\"$" "\\1" LIBGIT2_SOVERSION "${GIT2_HEADER_SOVERSION}")
 
 IF (DEPRECATE_HARD)
 	ADD_DEFINITIONS(-DGIT_DEPRECATE_HARD)
@@ -139,8 +129,8 @@ IF (MSVC)
 		SET(CRT_FLAG_RELEASE "/MD")
 	ENDIF()
 
-	IF (MSVC_CRTDBG)
-		SET(GIT_MSVC_CRTDBG 1)
+	IF (WIN32_LEAKCHECK)
+		SET(GIT_WIN32_LEAKCHECK 1)
 		SET(CRT_FLAG_DEBUG "${CRT_FLAG_DEBUG}")
 		SET(CMAKE_C_STANDARD_LIBRARIES "${CMAKE_C_STANDARD_LIBRARIES} Dbghelp.lib")
 	ENDIF()
@@ -175,7 +165,7 @@ IF (MSVC)
 	# /NXCOMPAT - Data execution prevention (DEP)
 	# /LARGEADDRESSAWARE - >2GB user address space on x86
 	# /VERSION - Embed version information in PE header
-	SET(CMAKE_EXE_LINKER_FLAGS "/DYNAMICBASE /NXCOMPAT /LARGEADDRESSAWARE /VERSION:${LIBGIT2_VERSION_MAJOR}.${LIBGIT2_VERSION_MINOR}")
+	SET(CMAKE_EXE_LINKER_FLAGS "/DYNAMICBASE /NXCOMPAT /LARGEADDRESSAWARE /VERSION:${libgit2_VERSION_MAJOR}.${libgit2_VERSION_MINOR}")
 
 	IF (NOT (MSVC_VERSION LESS 1900))
 		# /GUARD:CF - Enable Control Flow Guard
