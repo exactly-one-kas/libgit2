@@ -3,9 +3,9 @@ libgit2 - the Git linkable library
 
 | Build Status | |
 | ------------ | - |
-| **master** branch CI builds | [![CI Build](https://github.com/libgit2/libgit2/workflows/CI%20Build/badge.svg?event=push)](https://github.com/libgit2/libgit2/actions?query=workflow%3A%22CI+Build%22+event%3Apush) |
+| **main** branch CI builds | [![CI Build](https://github.com/libgit2/libgit2/workflows/CI%20Build/badge.svg?event=push)](https://github.com/libgit2/libgit2/actions?query=workflow%3A%22CI+Build%22+event%3Apush) |
+| **v1.2 branch** CI builds | [![CI Build](https://github.com/libgit2/libgit2/workflows/CI%20Build/badge.svg?branch=maint%2Fv1.2&event=push)](https://github.com/libgit2/libgit2/actions?query=workflow%3A%22CI+Build%22+event%3Apush+branch%3Amaint%2Fv1.2) |
 | **v1.1 branch** CI builds | [![CI Build](https://github.com/libgit2/libgit2/workflows/CI%20Build/badge.svg?branch=maint%2Fv1.1&event=push)](https://github.com/libgit2/libgit2/actions?query=workflow%3A%22CI+Build%22+event%3Apush+branch%3Amaint%2Fv1.1) |
-| **v1.0 branch** CI builds | [![Azure Pipelines Build Status](https://dev.azure.com/libgit2/libgit2/_apis/build/status/libgit2?branchName=maint/v1.0)](https://dev.azure.com/libgit2/libgit2/_build/latest?definitionId=7&branchName=maint/v1.0) |
 | **Nightly** builds | [![Nightly Build](https://github.com/libgit2/libgit2/workflows/Nightly%20Build/badge.svg)](https://github.com/libgit2/libgit2/actions?query=workflow%3A%22Nightly+Build%22) [![Coverity Scan Status](https://scan.coverity.com/projects/639/badge.svg)](https://scan.coverity.com/projects/639) |
 
 `libgit2` is a portable, pure C implementation of the Git core methods
@@ -104,7 +104,8 @@ Getting Help
 
 **Chat with us**
 
-- via IRC: join [#libgit2](https://webchat.freenode.net/#libgit2) on Freenode
+- via IRC: join [#libgit2](https://web.libera.chat/#libgit2) on
+  [libera](https://libera.chat).
 - via Slack: visit [slack.libgit2.org](http://slack.libgit2.org/) to sign up,
   then join us in `#libgit2`
 
@@ -224,6 +225,8 @@ On most systems you can build the library using the following commands
 
 Alternatively you can point the CMake GUI tool to the CMakeLists.txt file and generate platform specific build project or IDE workspace.
 
+If you're not familiar with CMake, [a more detailed explanation](https://preshing.com/20170511/how-to-build-a-cmake-based-project/) may be helpful.
+
 Running Tests
 -------------
 
@@ -242,7 +245,7 @@ run the index tests:
     $ ./libgit2_clar -sindex
 
 To run a single test named `index::racy::diff`, which corresponds to the test
-function [`test_index_racy__diff`](https://github.com/libgit2/libgit2/blob/master/tests/index/racy.c#L23):
+function [`test_index_racy__diff`](https://github.com/libgit2/libgit2/blob/main/tests/index/racy.c#L23):
 
     $ ./libgit2_clar -sindex::racy::diff
 
@@ -252,7 +255,7 @@ applicable to your platform or is particularly expensive.
 
 **Note:** There should be _no_ failing tests when you build an unmodified
 source tree from a [release](https://github.com/libgit2/libgit2/releases),
-or from the [master branch](https://github.com/libgit2/libgit2/tree/master).
+or from the [main branch](https://github.com/libgit2/libgit2/tree/main).
 Please contact us or [open an issue](https://github.com/libgit2/libgit2/issues)
 if you see test failures.
 
@@ -355,6 +358,7 @@ Here are the bindings to libgit2 that are currently available:
     * dlibgit <https://github.com/s-ludwig/dlibgit>
 * Delphi
     * GitForDelphi <https://github.com/libgit2/GitForDelphi>
+    * libgit2-delphi <https://github.com/todaysoftware/libgit2-delphi>
 * Erlang
     * Geef <https://github.com/carlosmn/geef>
 * Go
@@ -392,6 +396,7 @@ Here are the bindings to libgit2 that are currently available:
 * Python
     * pygit2 <https://github.com/libgit2/pygit2>
 * R
+    * gert <https://docs.ropensci.org/gert>
     * git2r <https://github.com/ropensci/git2r>
 * Ruby
     * Rugged <https://github.com/libgit2/rugged>

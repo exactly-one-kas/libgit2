@@ -543,6 +543,13 @@ int p_open(const char *path, int flags, ...)
 	mode_t mode = 0;
 	struct open_opts opts = {0};
 
+	#ifdef GIT_DEBUG_STRICT_OPEN
+	if (strstr(path, "//") != NULL) {
+		errno = EACCES;
+		return -1;
+	}
+	#endif
+
 	if (git_win32_path_from_utf8(wpath, path) < 0)
 		return -1;
 
@@ -683,7 +690,7 @@ static int getfinalpath_w(
 	return (int)git_win32_path_remove_namespace(dest, dwChars);
 }
 
-static int follow_and_lstat_link(git_win32_path path, struct stat* buf)
+static int follow_and_lstat_link(git_win32_path path, struct stat *buf)
 {
 	git_win32_path target_w;
 
@@ -709,7 +716,7 @@ int p_fstat(int fd, struct stat *buf)
 	return 0;
 }
 
-int p_stat(const char* path, struct stat* buf)
+int p_stat(const char *path, struct stat *buf)
 {
 	git_win32_path path_w;
 	int len;
@@ -726,7 +733,7 @@ int p_stat(const char* path, struct stat* buf)
 	return 0;
 }
 
-int p_chdir(const char* path)
+int p_chdir(const char *path)
 {
 	git_win32_path buf;
 
@@ -736,7 +743,7 @@ int p_chdir(const char* path)
 	return _wchdir(buf);
 }
 
-int p_chmod(const char* path, mode_t mode)
+int p_chmod(const char *path, mode_t mode)
 {
 	git_win32_path buf;
 
@@ -746,7 +753,7 @@ int p_chmod(const char* path, mode_t mode)
 	return _wchmod(buf, mode);
 }
 
-int p_rmdir(const char* path)
+int p_rmdir(const char *path)
 {
 	git_win32_path buf;
 	int error;
@@ -866,7 +873,7 @@ int p_mkstemp(char *tmp_path)
 	return p_open(tmp_path, O_RDWR | O_CREAT | O_EXCL, 0744); /* -V536 */
 }
 
-int p_access(const char* path, mode_t mode)
+int p_access(const char *path, mode_t mode)
 {
 	git_win32_path buf;
 

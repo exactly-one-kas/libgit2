@@ -114,6 +114,12 @@ typedef enum {
 	 * in the HEAD commit.
 	 */
 	GIT_BLOB_FILTER_ATTRIBUTES_FROM_HEAD = (1 << 2),
+
+	/**
+	 * When set, filters will be loaded from a `.gitattributes` file
+	 * in the specified commit.
+	 */
+	GIT_BLOB_FILTER_ATTRIBUTES_FROM_COMMIT = (1 << 3),
 } git_blob_filter_flag_t;
 
 /**
@@ -128,6 +134,12 @@ typedef struct {
 
 	/** Flags to control the filtering process, see `git_blob_filter_flag_t` above */
 	uint32_t flags;
+
+	/**
+	 * The commit to load attributes from, when
+	 * `GIT_BLOB_FILTER_ATTRIBUTES_FROM_COMMIT` is specified.
+	 */
+	git_oid *commit_id;
 } git_blob_filter_options;
 
 #define GIT_BLOB_FILTER_OPTIONS_VERSION 1
@@ -245,7 +257,7 @@ GIT_EXTERN(int) git_blob_create_from_stream_commit(
  * Write an in-memory buffer to the ODB as a blob
  *
  * @param id return the id of the written blob
- * @param repo repository where to blob will be written
+ * @param repo repository where the blob will be written
  * @param buffer data to be written into the blob
  * @param len length of the data
  * @return 0 or an error code

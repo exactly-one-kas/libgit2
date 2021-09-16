@@ -52,6 +52,10 @@
 # define WINHTTP_FLAG_SECURE_PROTOCOL_TLS1_3 0x00002000
 #endif
 
+#ifndef WINHTTP_NO_CLIENT_CERT_CONTEXT
+# define WINHTTP_NO_CLIENT_CERT_CONTEXT NULL
+#endif
+
 #ifndef HTTP_STATUS_PERMANENT_REDIRECT
 # define HTTP_STATUS_PERMANENT_REDIRECT 308
 #endif
@@ -111,7 +115,8 @@ typedef struct {
 	DWORD post_body_len;
 	unsigned sent_request : 1,
 		received_response : 1,
-		chunked : 1;
+		chunked : 1,
+		status_sending_request_reached: 1;
 } winhttp_stream;
 
 typedef struct {
@@ -149,7 +154,7 @@ static int apply_userpass_credentials(HINTERNET request, DWORD target, int mecha
 		native_scheme = WINHTTP_AUTH_SCHEME_BASIC;
 	} else {
 		git_error_set(GIT_ERROR_HTTP, "invalid authentication scheme");
-		error = -1;
+		error = GIT_EAUTH;
 		goto done;
 	}
 
@@ -188,7 +193,7 @@ static int apply_default_credentials(HINTERNET request, DWORD target, int mechan
 		native_scheme = WINHTTP_AUTH_SCHEME_NTLM;
 	} else {
 		git_error_set(GIT_ERROR_HTTP, "invalid authentication scheme");
-		return -1;
+		return GIT_EAUTH;
 	}
 
 	/*
@@ -245,7 +250,7 @@ static int acquire_fallback_cred(
 		hCoInitResult = CoInitializeEx(NULL, COINIT_MULTITHREADED);
 
 		if (SUCCEEDED(hCoInitResult) || hCoInitResult == RPC_E_CHANGED_MODE) {
-			IInternetSecurityManager* pISM;
+			IInternetSecurityManager *pISM;
 
 			/* And if the target URI is in the My Computer, Intranet, or Trusted zones */
 			if (SUCCEEDED(CoCreateInstance(&CLSID_InternetSecurityManager, NULL,
@@ -268,7 +273,7 @@ static int acquire_fallback_cred(
 				pISM->lpVtbl->Release(pISM);
 			}
 
-			/* Only unitialize if the call to CoInitializeEx was successful. */
+			/* Only uninitialize if the call to CoInitializeEx was successful. */
 			if (SUCCEEDED(hCoInitResult))
 				CoUninitialize();
 		}
@@ -424,7 +429,7 @@ static int winhttp_stream_connect(winhttp_stream *s)
 	proxy_opts = &t->owner->proxy;
 	if (proxy_opts->type == GIT_PROXY_AUTO) {
 		/* Set proxy if necessary */
-		if (git_remote__get_http_proxy(t->owner->owner, (strcmp(t->server.url.scheme, "https") == 0), &proxy_url) < 0)
+		if (git_remote__http_proxy(&proxy_url, t->owner->owner, &t->server.url) < 0)
 			goto on_error;
 	}
 	else if (proxy_opts->type == GIT_PROXY_SPECIFIED) {
@@ -611,7 +616,7 @@ static int parse_unauthorized_response(
 	 */
 	if (!WinHttpQueryAuthSchemes(request, &supported, &first, &target)) {
 		git_error_set(GIT_ERROR_OS, "failed to parse supported auth schemes");
-		return -1;
+		return GIT_EAUTH;
 	}
 
 	if (WINHTTP_AUTH_SCHEME_NTLM & supported) {
@@ -713,30 +718,36 @@ static void CALLBACK winhttp_status(
 	DWORD status;
 
 	GIT_UNUSED(connection);
-	GIT_UNUSED(ctx);
 	GIT_UNUSED(info_len);
 
-	if (code != WINHTTP_CALLBACK_STATUS_SECURE_FAILURE)
-		return;
+	switch (code) {
+		case WINHTTP_CALLBACK_STATUS_SECURE_FAILURE:
+			status = *((DWORD *)info);
 
-	status = *((DWORD *)info);
+			if ((status & WINHTTP_CALLBACK_STATUS_FLAG_CERT_CN_INVALID))
+				git_error_set(GIT_ERROR_HTTP, "SSL certificate issued for different common name");
+			else if ((status & WINHTTP_CALLBACK_STATUS_FLAG_CERT_DATE_INVALID))
+				git_error_set(GIT_ERROR_HTTP, "SSL certificate has expired");
+			else if ((status & WINHTTP_CALLBACK_STATUS_FLAG_INVALID_CA))
+				git_error_set(GIT_ERROR_HTTP, "SSL certificate signed by unknown CA");
+			else if ((status & WINHTTP_CALLBACK_STATUS_FLAG_INVALID_CERT))
+				git_error_set(GIT_ERROR_HTTP, "SSL certificate is invalid");
+			else if ((status & WINHTTP_CALLBACK_STATUS_FLAG_CERT_REV_FAILED))
+				git_error_set(GIT_ERROR_HTTP, "certificate revocation check failed");
+			else if ((status & WINHTTP_CALLBACK_STATUS_FLAG_CERT_REVOKED))
+				git_error_set(GIT_ERROR_HTTP, "SSL certificate was revoked");
+			else if ((status & WINHTTP_CALLBACK_STATUS_FLAG_SECURITY_CHANNEL_ERROR))
+				git_error_set(GIT_ERROR_HTTP, "security libraries could not be loaded");
+			else
+				git_error_set(GIT_ERROR_HTTP, "unknown security error %lu", status);
 
-	if ((status & WINHTTP_CALLBACK_STATUS_FLAG_CERT_CN_INVALID))
-		git_error_set(GIT_ERROR_HTTP, "SSL certificate issued for different common name");
-	else if ((status & WINHTTP_CALLBACK_STATUS_FLAG_CERT_DATE_INVALID))
-		git_error_set(GIT_ERROR_HTTP, "SSL certificate has expired");
-	else if ((status & WINHTTP_CALLBACK_STATUS_FLAG_INVALID_CA))
-		git_error_set(GIT_ERROR_HTTP, "SSL certificate signed by unknown CA");
-	else if ((status & WINHTTP_CALLBACK_STATUS_FLAG_INVALID_CERT))
-		git_error_set(GIT_ERROR_HTTP, "SSL certificate is invalid");
-	else if ((status & WINHTTP_CALLBACK_STATUS_FLAG_CERT_REV_FAILED))
-		git_error_set(GIT_ERROR_HTTP, "certificate revocation check failed");
-	else if ((status & WINHTTP_CALLBACK_STATUS_FLAG_CERT_REVOKED))
-		git_error_set(GIT_ERROR_HTTP, "SSL certificate was revoked");
-	else if ((status & WINHTTP_CALLBACK_STATUS_FLAG_SECURITY_CHANNEL_ERROR))
-		git_error_set(GIT_ERROR_HTTP, "security libraries could not be loaded");
-	else
-		git_error_set(GIT_ERROR_HTTP, "unknown security error %lu", status);
+			break;
+
+		case WINHTTP_CALLBACK_STATUS_SENDING_REQUEST:
+			((winhttp_stream *) ctx)->status_sending_request_reached = 1;
+
+			break;
+	}
 }
 
 static int winhttp_connect(
@@ -836,7 +847,12 @@ static int winhttp_connect(
 		goto on_error;
 	}
 
-	if (WinHttpSetStatusCallback(t->connection, winhttp_status, WINHTTP_CALLBACK_FLAG_SECURE_FAILURE, 0) == WINHTTP_INVALID_STATUS_CALLBACK) {
+	if (WinHttpSetStatusCallback(
+			t->connection,
+			winhttp_status,
+			WINHTTP_CALLBACK_FLAG_SECURE_FAILURE | WINHTTP_CALLBACK_FLAG_SEND_REQUEST,
+			0
+		) == WINHTTP_INVALID_STATUS_CALLBACK) {
 		git_error_set(GIT_ERROR_OS, "failed to set status callback");
 		goto on_error;
 	}
@@ -847,6 +863,7 @@ on_error:
 	if (error < 0)
 		winhttp_close_connection(t);
 
+	git_buf_dispose(&ua);
 	git_buf_dispose(&ipv6);
 	git__free(wide_host);
 	git__free(wide_ua);
@@ -869,12 +886,12 @@ static int do_send_request(winhttp_stream *s, size_t len, bool chunked)
 			success = WinHttpSendRequest(s->request,
 				WINHTTP_NO_ADDITIONAL_HEADERS, 0,
 				WINHTTP_NO_REQUEST_DATA, 0,
-				WINHTTP_IGNORE_REQUEST_TOTAL_LENGTH, 0);
+				WINHTTP_IGNORE_REQUEST_TOTAL_LENGTH, (DWORD_PTR)s);
 		} else {
 			success = WinHttpSendRequest(s->request,
 				WINHTTP_NO_ADDITIONAL_HEADERS, 0,
 				WINHTTP_NO_REQUEST_DATA, 0,
-				(DWORD)len, 0);
+				(DWORD)len, (DWORD_PTR)s);
 		}
 
 		if (success || GetLastError() != (DWORD)SEC_E_BUFFER_TOO_SMALL)
@@ -911,7 +928,13 @@ static int send_request(winhttp_stream *s, size_t len, bool chunked)
 			}
 		}
 
-		if (!request_failed || !cert_valid) {
+		/*
+		 * Only check the certificate if we were able to reach the sending request phase, or
+		 * received a secure failure error. Otherwise, the server certificate won't be available
+		 * since the request wasn't able to complete (e.g. proxy auth required)
+		 */
+		if (!cert_valid ||
+			(!request_failed && s->status_sending_request_reached)) {
 			git_error_clear();
 			if ((error = certificate_check(s, cert_valid)) < 0) {
 				if (!git_error_last())
@@ -1017,7 +1040,7 @@ replay:
 	/* Enforce a reasonable cap on the number of replays */
 	if (replay_count++ >= GIT_HTTP_REPLAY_MAX) {
 		git_error_set(GIT_ERROR_HTTP, "too many redirects or authentication replays");
-		return -1;
+		return GIT_ERROR; /* not GIT_EAUTH because the exact cause is not clear */
 	}
 
 	/* Connect if necessary */

@@ -14,7 +14,6 @@
 
 #include "filebuf.h"
 #include "filter.h"
-#include "buf_text.h"
 
 const void *git_blob_rawcontent(const git_blob *blob)
 {
@@ -198,11 +197,7 @@ int git_blob__create_from_paths(
 	GIT_ASSERT_ARG(hint_path || !try_load_filters);
 
 	if (!content_path) {
-		if (git_repository__ensure_not_bare(repo, "create blob from file") < 0)
-			return GIT_EBAREREPO;
-
-		if (git_buf_joinpath(
-				&path, git_repository_workdir(repo), hint_path) < 0)
+		if (git_repository_workdir_path(&path, repo, hint_path) < 0)
 			return -1;
 
 		content_path = path.ptr;
@@ -405,7 +400,7 @@ int git_blob_is_binary(const git_blob *blob)
 
 	git_buf_attach_notowned(&content, git_blob_rawcontent(blob),
 		(size_t)min(size, GIT_FILTER_BYTES_TO_CHECK_NUL));
-	return git_buf_text_is_binary(&content);
+	return git_buf_is_binary(&content);
 }
 
 int git_blob_filter_options_init(
@@ -426,7 +421,7 @@ int git_blob_filter(
 	int error = 0;
 	git_filter_list *fl = NULL;
 	git_blob_filter_options opts = GIT_BLOB_FILTER_OPTIONS_INIT;
-	git_filter_flag_t flags = GIT_FILTER_DEFAULT;
+	git_filter_options filter_opts = GIT_FILTER_OPTIONS_INIT;
 
 	GIT_ASSERT_ARG(blob);
 	GIT_ASSERT_ARG(path);
@@ -446,14 +441,19 @@ int git_blob_filter(
 		return 0;
 
 	if ((opts.flags & GIT_BLOB_FILTER_NO_SYSTEM_ATTRIBUTES) != 0)
-		flags |= GIT_FILTER_NO_SYSTEM_ATTRIBUTES;
+		filter_opts.flags |= GIT_FILTER_NO_SYSTEM_ATTRIBUTES;
 
 	if ((opts.flags & GIT_BLOB_FILTER_ATTRIBUTES_FROM_HEAD) != 0)
-		flags |= GIT_FILTER_ATTRIBUTES_FROM_HEAD;
+		filter_opts.flags |= GIT_FILTER_ATTRIBUTES_FROM_HEAD;
 
-	if (!(error = git_filter_list_load(
+	if ((opts.flags & GIT_BLOB_FILTER_ATTRIBUTES_FROM_COMMIT) != 0) {
+		filter_opts.flags |= GIT_FILTER_ATTRIBUTES_FROM_COMMIT;
+		filter_opts.commit_id = opts.commit_id;
+	}
+
+	if (!(error = git_filter_list_load_ext(
 			&fl, git_blob_owner(blob), blob, path,
-			GIT_FILTER_TO_WORKTREE, flags))) {
+			GIT_FILTER_TO_WORKTREE, &filter_opts))) {
 
 		error = git_filter_list_apply_to_blob(out, fl, blob);
 

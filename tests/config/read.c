@@ -213,6 +213,13 @@ void test_config_read__symbol_headers(void)
 	git_config_free(cfg);
 }
 
+void test_config_read__multiline_multiple_quoted_comment_chars(void)
+{
+	git_config *cfg;
+	cl_git_pass(git_config_open_ondisk(&cfg, cl_fixture("config/config21")));
+	git_config_free(cfg);
+}
+
 void test_config_read__header_in_last_line(void)
 {
 	git_config *cfg;
@@ -964,7 +971,7 @@ void test_config_read__get_mapped(void)
 								  "  key9 = off\n");
 	cl_git_pass(git_config_open_ondisk(&cfg, "./testconfig"));
 
-	// check parsing bool and string
+	/* check parsing bool and string */
 	cl_git_pass(git_config_get_mapped(&val, cfg, "header.key1", _test_map1, ARRAY_SIZE(_test_map1)));
 	cl_assert_equal_i(val, MAP_TRUE);
 	cl_git_pass(git_config_get_mapped(&val, cfg, "header.key2", _test_map1, ARRAY_SIZE(_test_map1)));
@@ -986,7 +993,7 @@ void test_config_read__get_mapped(void)
 
 	cl_git_fail(git_config_get_mapped(&val, cfg, "header.key7", _test_map1, ARRAY_SIZE(_test_map1)));
 
-	// check parsing int values
+	/* check parsing int values */
 	cl_git_pass(git_config_get_mapped(&val, cfg, "header.key1", _test_map2, ARRAY_SIZE(_test_map2)));
 	cl_git_pass(git_config_get_int32(&known_good, cfg, "header.key1"));
 	cl_assert_equal_i(val, known_good);

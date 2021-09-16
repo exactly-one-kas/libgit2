@@ -597,7 +597,7 @@ static int apply_credentials(
 			free_auth_context(server);
 	} else if (!token.size) {
 		git_error_set(GIT_ERROR_HTTP, "failed to respond to authentication challenge");
-		error = -1;
+		error = GIT_EAUTH;
 		goto done;
 	}
 
@@ -670,7 +670,7 @@ static int generate_connect_request(
 	git_buf_puts(buf, "\r\n");
 
 	git_buf_puts(buf, "Host: ");
-	puts_host_and_port(buf, &client->proxy.url, false);
+	puts_host_and_port(buf, &client->server.url, true);
 	git_buf_puts(buf, "\r\n");
 
 	if ((error = apply_proxy_credentials(buf, client, request) < 0))
@@ -679,6 +679,11 @@ static int generate_connect_request(
 	git_buf_puts(buf, "\r\n");
 
 	return git_buf_oom(buf) ? -1 : 0;
+}
+
+static bool use_connect_proxy(git_http_client *client)
+{
+    return client->proxy.url.host && !strcmp(client->server.url.scheme, "https");
 }
 
 static int generate_request(
@@ -734,7 +739,8 @@ static int generate_request(
 		git_buf_printf(buf, "Expect: 100-continue\r\n");
 
 	if ((error = apply_server_credentials(buf, client, request)) < 0 ||
-	    (error = apply_proxy_credentials(buf, client, request)) < 0)
+	    (!use_connect_proxy(client) &&
+			(error = apply_proxy_credentials(buf, client, request)) < 0))
 		return error;
 
 	if (request->custom_headers) {
@@ -1027,8 +1033,7 @@ static int http_client_connect(
 	reset_parser(client);
 
 	/* Reconnect to the proxy if necessary. */
-	use_proxy = client->proxy.url.host &&
-	            !strcmp(client->server.url.scheme, "https");
+	use_proxy = use_connect_proxy(client);
 
 	if (use_proxy) {
 		if (!client->proxy_connected || !client->keepalive ||
@@ -1503,7 +1508,7 @@ int git_http_client_skip_body(git_http_client *client)
 			              "unexpected data handled in callback");
 			error = -1;
 		}
-	} while (!error);
+	} while (error >= 0 && client->state != DONE);
 
 	if (error < 0)
 		client->connected = 0;
